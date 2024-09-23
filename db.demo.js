@@ -10,11 +10,13 @@ const connection = mysql.createConnection({
   dateStrings: true
 });
 
+module.exports = connection
+
 // A simple SELECT query
-connection.query(
-  'SELECT * FROM `users`',
-  function (err, results, fields) {
-    console.log(results); 
-    console.log(fields);
-  }
-);
+// connection.query(
+//   'SELECT * FROM `users`',
+//   function (err, results, fields) {
+//     console.log(results); 
+//     console.log(fields);
+//   }
+// );
