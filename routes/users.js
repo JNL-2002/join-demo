@@ -1,23 +1,62 @@
 const express = require('express')
 const router = express.Router()
 const conn = require('../db.demo')
+const {body, param, validationResult} = require('express-validator')
+const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv')
+
+dotenv.config();
 
 router.use(express.json())
 
-//로그인
-router.post('/login', function(req, res){
-    const {email, password} = req.body
+const validate = (req, res, next) => {
+    const err = validationResult(req)
+
+        if (err.isEmpty()){
+            return next();
+    } else {
+        return res.status(400).json(err.array())
+    }
+}
+
+// 로그인
+router.post(
+    '/login',
+    [
+        body('email').notEmpty().isEmail().withMessage('이메일 확인'),
+        body('password').notEmpty().isString().withMessage('비밀번호 확인'),
+        validate
+    ],
+        function(req, res){
+        const {email, password} = req.body
 
     conn.query(
         `SELECT * FROM users Where email = ?`, email,
         function (err, results) {
+            if(err) {
+                return res.status(400).end()
+            }
+
             let loginUser = results[0]
+
             if (loginUser && loginUser.password == password) {
+                    const token = jwt.sign({
+                        email : loginUser.email,
+                        name : loginUser.name
+                    }, process.env.USERS, {
+                        expiresIn : '5m',
+                        issuer : 'Me'
+                    });
+
+                    res.cookie("token", token, {
+                        HttpOnly : true
+                    });
+
                     res.status(200).json({
-                         message : `${loginUser.name}님 로그인 되었습니다.`
+                         message : `${loginUser.name}님 로그인 되었습니다.`,
                      })
             } else {
-                res.status(404).json({
+                res.status(403).json({
                     message : '이메일 또는 비밀번호가 틀렸습니다.'
                 })
             }
@@ -26,46 +65,76 @@ router.post('/login', function(req, res){
 })
 
 //회원 가입
-router.post('/join', function(req, res){
-
-    if (req.body == {}) {
-        res.status(400).json({
-            message : `입력 값을 다시 확인해 주세요.`
-        })
-    } else {
+router.post(
+    '/join',
+    [
+        body('email').notEmpty().isEmail().withMessage('이메일 확인'),
+        body('name').notEmpty().isString().withMessage('이름 확인'),
+        body('password').notEmpty().isString().withMessage('비밀번호 확인'),
+        body('contact').notEmpty().isString().withMessage('연락처 확인'),
+        validate
+    ],
+    function(req, res){
        const {email, name, password, contact} = req.body
 
        conn.query(
         `INSERT INTO users (email, name, password, contact) 
         VALUES (?, ?, ?, ?)`, [email, name, password, contact],
-        function (err, results, fields) {
+        function (err, results) {
+            if(err) {
+                return res.status(400).end()
+            }
             res.status(201).json(results)
         }
         );
-}
+
 })
 
 //회원 개별 조회
-router.get('/users', function(req, res){
+router.get(
+    '/users',
+    [
+        body('email').notEmpty().isEmail().withMessage('이메일 확인'),
+        validate
+    ],
+    function(req, res){
     let {email} = req.body
 
     conn.query(
         `SELECT * FROM users WHERE email = ?`, email,
         function (err, results) {
+            if(err) {
+                return res.status(400).end()
+            }
+
             res.status(200).json (results)
         }
         );
 })
 
 // 회원 탈퇴
-router.delete('/users', function(req, res){
+router.delete(
+    '/users',
+    [
+        body('email').notEmpty().isEmail().withMessage('이메일 확인'),
+        validate
+    ], 
+    function(req, res){
     let {email} = req.body
 
     conn.query(
         `DELETE FROM users WHERE email = ?`, email,
         function (err, results) {
-            res.status(200).json (results)
+            if(err) {
+                return res.status(400).end()
+            }
+            if (results.affectedRows == 0){
+                return res.status(400).end()
+            } else {
+                res.status(200).json(results)
+            }
         }
+        
         );
 
 })
